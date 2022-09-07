@@ -94,7 +94,7 @@ public class OrderMessageService {
 
             channel.queueBind(
                     "queue.order",
-                    "exchange.order.settlement",
+                    "exchange.settlement.order",
                     "key.order");
 
             /*---------------------reward---------------------*/
