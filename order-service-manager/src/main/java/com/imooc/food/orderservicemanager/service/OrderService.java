@@ -29,13 +29,6 @@ public class OrderService {
     @Autowired
     RabbitTemplate rabbitTemplate;
 
-    @Value("${rabbitmq.exchange}")
-    public String exchangeName;
-    @Value("${rabbitmq.restaurant-routing-key}")
-    public String restaurantRoutingKey;
-    @Value("${rabbitmq.deliveryman-routing-key}")
-    public String deliverymanRoutingKey;
-
     ObjectMapper objectMapper = new ObjectMapper();
 
 
@@ -57,32 +50,18 @@ public class OrderService {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
 
-        try (Connection connection = connectionFactory.newConnection();
-             Channel channel = connection.createChannel()) {
-            String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
-            channel.confirmSelect();
-            channel.addConfirmListener(new ConfirmListener() {
-                @Override
-                public void handleAck(long deliveryTag, boolean multiple) throws IOException {
-                    log.info("Ack, deliveryTag: {}, multiple: {}", deliveryTag, multiple);
-                }
-
-                @Override
-                public void handleNack(long deliveryTag, boolean multiple) throws IOException {
-                    log.info("Nack, deliveryTag: {}, multiple: {}", deliveryTag, multiple);
-                }
-            });
-            for (int i = 0; i < 10; i++) {
-                channel.basicPublish("exchange.order.restaurant", "key.restaurant", null, messageToSend.getBytes());
-                log.info("message sent");
-            }
-            if (channel.waitForConfirms()) {
-                log.info("confirm OK");
-            } else {
-                log.info("confirm Failed");
-            }
-            Thread.sleep(100000);
-        }
-
+       try(Connection connection = connectionFactory.newConnection();
+       Channel channel = connection.createChannel()){
+           channel.confirmSelect();
+           String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+           for (int i = 0; i<10; i++){
+               channel.basicPublish("exchange.order.restaurant", "key.restaurant",null, messageToSend.getBytes());
+           }
+            log.info("message sent");
+           if (channel.waitForConfirms()){
+               log.info("RabbitMq");
+           }
+       }
     }
+
 }

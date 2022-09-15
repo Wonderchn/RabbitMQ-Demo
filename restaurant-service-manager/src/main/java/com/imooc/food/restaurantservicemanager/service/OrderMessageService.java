@@ -83,7 +83,7 @@ public class OrderMessageService {
             log.info("onMessage:productPO:{}", productPO);
             RestaurantPO restaurantPO = restaurantDao.selsctRestaurant(productPO.getRestaurantId());
             log.info("onMessage:restaurantPO:{}", restaurantPO);
-            if (ProductStatus.AVALIABIE == productPO.getStatus() && RestaurantStatus.OPEN == restaurantPO.getStatus()) {
+            if (ProductStatus.AVALIABLE == productPO.getStatus() && RestaurantStatus.OPEN == restaurantPO.getStatus()) {
                 orderMessageDTO.setConfirmed(true);
                 orderMessageDTO.setPrice(productPO.getPrice());
             } else {

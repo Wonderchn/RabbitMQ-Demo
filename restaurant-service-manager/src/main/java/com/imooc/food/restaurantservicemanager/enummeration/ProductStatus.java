@@ -4,7 +4,7 @@ public enum  ProductStatus {
     /**
      * 可售卖
      */
-    AVALIABIE,
+    AVALIABLE,
     /**
      * 不可售卖
      */
