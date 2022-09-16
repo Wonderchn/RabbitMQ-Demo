@@ -50,18 +50,47 @@ public class OrderService {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
 
-       try(Connection connection = connectionFactory.newConnection();
-       Channel channel = connection.createChannel()){
-           channel.confirmSelect();
-           String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
-           for (int i = 0; i<10; i++){
-               channel.basicPublish("exchange.order.restaurant", "key.restaurant",null, messageToSend.getBytes());
-           }
-            log.info("message sent");
-           if (channel.waitForConfirms()){
-               log.info("RabbitMq");
-           }
-       }
+        try (Connection connection = connectionFactory.newConnection();
+             Channel channel = connection.createChannel()) {
+//           channel.confirmSelect();
+//           String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+//            log.info("message sent");
+//           if (channel.waitForConfirms()){
+//               log.info("RabbitMq");
+//           }
+
+            //           channel.confirmSelect();
+//           String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+//           //多条同步消息确认
+//           for (int i = 0; i<10; i++){
+//               channel.basicPublish("exchange.order.restaurant", "key.restaurant",null, messageToSend.getBytes());
+//           }
+//            log.info("message sent");
+//           if (channel.waitForConfirms()){
+//               log.info("RabbitMq");
+//           }
+
+            //异步确认方法
+            channel.confirmSelect();
+            ConfirmListener confirmListener = new ConfirmListener() {
+                @Override
+                public void handleAck(long deliveryTag, boolean multiple) throws IOException {
+                    log.info("ACK,deliveryTag:{},multiple:{}", deliveryTag, multiple);
+                }
+
+                @Override
+                public void handleNack(long deliveryTag, boolean multiple) throws IOException {
+                    log.info("NACK,deliveryTag:{},multiple:{}", deliveryTag, multiple);
+
+                }
+            };
+            channel.addConfirmListener(confirmListener);
+            String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+            for (int i = 0; i < 10; i++) {
+                channel.basicPublish("exchange.order.restaurant", "key.restaurant", null, messageToSend.getBytes());
+            }
+            Thread.sleep(10000);
+        }
     }
 
 }
