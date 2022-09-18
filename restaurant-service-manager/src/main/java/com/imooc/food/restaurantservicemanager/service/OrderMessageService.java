@@ -9,11 +9,7 @@ import com.imooc.food.restaurantservicemanager.enummeration.ProductStatus;
 import com.imooc.food.restaurantservicemanager.enummeration.RestaurantStatus;
 import com.imooc.food.restaurantservicemanager.po.ProductPO;
 import com.imooc.food.restaurantservicemanager.po.RestaurantPO;
-import com.rabbitmq.client.BuiltinExchangeType;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
+import com.rabbitmq.client.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -93,6 +89,20 @@ public class OrderMessageService {
 
             try (Connection connection = connectionFactory.newConnection();
                  Channel channel = connection.createChannel()) {
+                //消息返回机制
+//                channel.addReturnListener(new ReturnListener() {
+//                    @Override
+//                    public void handleReturn(int replyCode, String replyText, String exchange, String routingKey, AMQP.BasicProperties properties, byte[] body) throws IOException {
+//                        log.info("Message Return: replyCode:{}, replyText:{}, exchange:{}, routingKey:{}, " +"properties:{}, " +"body:{}",
+//                                replyCode,  replyText,  exchange,  routingKey,  properties, body);
+//                    }
+//                });
+                channel.addReturnListener(new ReturnCallback() {
+                    @Override
+                    public void handle(Return returnMessage) {
+                        log.info("Message Return: returnMessage:{}", returnMessage);
+                    }
+                });
                 String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
                 channel.basicPublish("exchange.order.restaurant", "key.order", null, messageToSend.getBytes());
             }
