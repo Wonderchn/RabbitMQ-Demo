@@ -9,7 +9,15 @@ import com.imooc.food.restaurantservicemanager.enummeration.ProductStatus;
 import com.imooc.food.restaurantservicemanager.enummeration.RestaurantStatus;
 import com.imooc.food.restaurantservicemanager.po.ProductPO;
 import com.imooc.food.restaurantservicemanager.po.RestaurantPO;
-import com.rabbitmq.client.*;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.BuiltinExchangeType;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DeliverCallback;
+import com.rabbitmq.client.Return;
+import com.rabbitmq.client.ReturnCallback;
+import com.rabbitmq.client.ReturnListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -29,39 +37,36 @@ public class OrderMessageService {
     @Autowired
     RestaurantDao restaurantDao;
 
+    Channel channel;
+
     @Async
     public void handleMessage() throws IOException, TimeoutException, InterruptedException {
         log.info("start linstening message");
-        ConnectionFactory connectionFactory = new ConnectionFactory();
-        connectionFactory.setHost("localhost");
-        try (Connection connection = connectionFactory.newConnection();
-             Channel channel = connection.createChannel()) {
 
-            channel.exchangeDeclare(
-                    "exchange.order.restaurant",
-                    BuiltinExchangeType.DIRECT,
-                    true,
-                    false,
-                    null);
+        channel.exchangeDeclare(
+                "exchange.order.restaurant",
+                BuiltinExchangeType.DIRECT,
+                true,
+                false,
+                null);
 
-            channel.queueDeclare(
-                    "queue.restaurant",
-                    true,
-                    false,
-                    false,
-                    null);
+        channel.queueDeclare(
+                "queue.restaurant",
+                true,
+                false,
+                false,
+                null);
 
-            channel.queueBind(
-                    "queue.restaurant",
-                    "exchange.order.restaurant",
-                    "key.restaurant");
+        channel.queueBind(
+                "queue.restaurant",
+                "exchange.order.restaurant",
+                "key.restaurant");
 
 
-            channel.basicConsume("queue.restaurant", true, deliverCallback, consumerTag -> {
-            });
-            while (true) {
-                Thread.sleep(100000);
-            }
+        channel.basicConsume("queue.restaurant", true, deliverCallback, consumerTag -> {
+        });
+        while (true) {
+            Thread.sleep(100000);
         }
     }
 
@@ -69,8 +74,6 @@ public class OrderMessageService {
     DeliverCallback deliverCallback = (consumerTag, message) -> {
         String messageBody = new String(message.getBody());
         log.info("deliverCallback:messageBody:{}", messageBody);
-        ConnectionFactory connectionFactory = new ConnectionFactory();
-        connectionFactory.setHost("localhost");
         try {
             OrderMessageDTO orderMessageDTO = objectMapper.readValue(messageBody,
                     OrderMessageDTO.class);
@@ -86,27 +89,43 @@ public class OrderMessageService {
                 orderMessageDTO.setConfirmed(false);
             }
             log.info("sendMessage:restaurantOrderMessageDTO:{}", orderMessageDTO);
+            //AutoClosable
 
-            try (Connection connection = connectionFactory.newConnection();
-                 Channel channel = connection.createChannel()) {
-                //消息返回机制
+
 //                channel.addReturnListener(new ReturnListener() {
 //                    @Override
-//                    public void handleReturn(int replyCode, String replyText, String exchange, String routingKey, AMQP.BasicProperties properties, byte[] body) throws IOException {
-//                        log.info("Message Return: replyCode:{}, replyText:{}, exchange:{}, routingKey:{}, " +"properties:{}, " +"body:{}",
-//                                replyCode,  replyText,  exchange,  routingKey,  properties, body);
+//                    public void handleReturn(int replyCode,
+//                                             String replyText,
+//                                             String exchange,
+//                                             String routingKey,
+//                                             AMQP.BasicProperties properties,
+//                                             byte[] body
+//                    ) throws IOException {
+//                        log.info("Message Return: " +
+//                                "replyCode:{}, replyText:{}, exchange:{}, routingKey:{}, properties:{}, body:{}",
+//                                replyCode, replyText, exchange, routingKey, properties, new String(body));
+//                        //除了打印log，可以加别的业务操作
 //                    }
 //                });
-                channel.addReturnListener(new ReturnCallback() {
-                    @Override
-                    public void handle(Return returnMessage) {
-                        log.info("Message Return: returnMessage:{}", returnMessage);
-                    }
-                });
-                String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
-                channel.basicPublish("exchange.order.restaurant", "key.order", null, messageToSend.getBytes());
-            }
-        } catch (JsonProcessingException | TimeoutException e) {
+
+            channel.addReturnListener(new ReturnCallback() {
+                @Override
+                public void handle(Return returnMessage) {
+                    log.info("Message Return: returnMessage{}", returnMessage);
+
+                    //除了打印log，可以加别的业务操作
+                }
+            });
+            //此处表明消费端ACK接收失败，multiple为false
+//            channel.basicAck(message.getEnvelope().getDeliveryTag(),false);
+            //实现重回队列
+            channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);
+
+            String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+            channel.basicPublish("exchange.order.restaurant", "key.order", true, null, messageToSend.getBytes());
+            Thread.sleep(1000);
+
+        } catch (JsonProcessingException | InterruptedException e) {
             e.printStackTrace();
         }
     };
