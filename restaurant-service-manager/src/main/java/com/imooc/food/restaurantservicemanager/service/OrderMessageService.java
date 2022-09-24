@@ -9,15 +9,7 @@ import com.imooc.food.restaurantservicemanager.enummeration.ProductStatus;
 import com.imooc.food.restaurantservicemanager.enummeration.RestaurantStatus;
 import com.imooc.food.restaurantservicemanager.po.ProductPO;
 import com.imooc.food.restaurantservicemanager.po.RestaurantPO;
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.BuiltinExchangeType;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
-import com.rabbitmq.client.Return;
-import com.rabbitmq.client.ReturnCallback;
-import com.rabbitmq.client.ReturnListener;
+import com.rabbitmq.client.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -37,6 +29,7 @@ public class OrderMessageService {
     @Autowired
     RestaurantDao restaurantDao;
 
+    @Autowired
     Channel channel;
 
     @Async
@@ -63,7 +56,8 @@ public class OrderMessageService {
                 "key.restaurant");
 
 
-        channel.basicConsume("queue.restaurant", true, deliverCallback, consumerTag -> {
+        //关闭自动ACK
+        channel.basicConsume("queue.restaurant", false, deliverCallback, consumerTag -> {
         });
         while (true) {
             Thread.sleep(100000);
@@ -116,12 +110,15 @@ public class OrderMessageService {
                     //除了打印log，可以加别的业务操作
                 }
             });
-            //此处表明消费端ACK接收失败，multiple为false
+            //multiple为false,表明为单条手动ACK
+            //multiple为true，则为多条手动ACK
+            //推荐使用单条ACK
 //            channel.basicAck(message.getEnvelope().getDeliveryTag(),false);
             //实现重回队列
             channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);
 
             String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
+            //此处mandatory 设置为true，意思为如果发送失败，则会调用发送端的ReturnListener相关方法
             channel.basicPublish("exchange.order.restaurant", "key.order", true, null, messageToSend.getBytes());
             Thread.sleep(1000);
 
