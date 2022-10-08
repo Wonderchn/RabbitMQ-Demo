@@ -16,6 +16,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 @Slf4j
@@ -43,12 +45,18 @@ public class OrderMessageService {
                 false,
                 null);
 
+        //重新声明队列需要把原先的队列进行一个删除操作
+        Map<String,Object> args = new HashMap<String,Object>(16);
+        args.put("x-message-ttl", 150000);
+
+        // 声明队列
         channel.queueDeclare(
                 "queue.restaurant",
                 true,
                 false,
                 false,
-                null);
+                args);
+
 
         channel.queueBind(
                 "queue.restaurant",
@@ -57,6 +65,7 @@ public class OrderMessageService {
 
 
         //关闭自动ACK
+        channel.basicQos(2);
         channel.basicConsume("queue.restaurant", false, deliverCallback, consumerTag -> {
         });
         while (true) {
@@ -113,6 +122,10 @@ public class OrderMessageService {
             //multiple为false,表明为单条手动ACK
             //multiple为true，则为多条手动ACK
             //推荐使用单条ACK
+            // 多条消息手动签收(5条消息全部签收一次)
+            if (message.getEnvelope().getDeliveryTag() % 5 == 0) {
+                channel.basicAck(message.getEnvelope().getDeliveryTag(), true);
+            }
 //            channel.basicAck(message.getEnvelope().getDeliveryTag(),false);
             //实现重回队列
             channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);

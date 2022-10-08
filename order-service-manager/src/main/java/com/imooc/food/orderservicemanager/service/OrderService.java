@@ -6,10 +6,7 @@ import com.imooc.food.orderservicemanager.dto.OrderMessageDTO;
 import com.imooc.food.orderservicemanager.enummeration.OrderStatus;
 import com.imooc.food.orderservicemanager.po.OrderDetailPO;
 import com.imooc.food.orderservicemanager.vo.OrderCreateVO;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.ConfirmListener;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,7 +84,9 @@ public class OrderService {
             channel.addConfirmListener(confirmListener);
             String messageToSend = objectMapper.writeValueAsString(orderMessageDTO);
             for (int i = 0; i < 10; i++) {
-                channel.basicPublish("exchange.order.restaurant", "key.restaurant", null, messageToSend.getBytes());
+                //设置单条消息的过期时间
+                AMQP.BasicProperties properties = new AMQP.BasicProperties().builder().expiration("15000").build();
+                channel.basicPublish("exchange.order.restaurant", "key.restaurant", properties, messageToSend.getBytes());
             }
             Thread.sleep(10000);
         }
