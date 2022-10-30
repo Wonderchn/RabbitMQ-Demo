@@ -1,7 +1,6 @@
 package com.imooc.food.orderservicemanager.config;
 
 import com.imooc.food.orderservicemanager.service.OrderMessageService;
-import com.rabbitmq.client.BuiltinExchangeType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
