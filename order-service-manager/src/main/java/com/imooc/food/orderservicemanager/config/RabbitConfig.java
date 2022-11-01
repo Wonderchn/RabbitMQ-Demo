@@ -4,8 +4,10 @@ import com.imooc.food.orderservicemanager.service.OrderMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
@@ -18,78 +20,105 @@ public class RabbitConfig {
     @Autowired
     OrderMessageService orderMessageService;
 
+    //方法被@Autowired注解上，会自动执行相关方法
     @Autowired
     public void startListenMessage() throws IOException, TimeoutException, InterruptedException {
         orderMessageService.handleMessage();
     }
 
-    @Autowired
-    public void initRabbit() {
-        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
-        connectionFactory.setHost("127.0.0.1");
-        connectionFactory.setPort(5672);
-        connectionFactory.setUsername("guest");
-        connectionFactory.setPassword("guest");
-        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory);
+    /*---------------------restaurant---------------------*/
+    @Bean
+    public Exchange exchange1() {
+        return new DirectExchange("exchange.order.restaurant");
+    }
 
+    @Bean
+    public Queue queue1() {
+        return new Queue("queue.order");
+    }
 
-        /*---------------------restaurant---------------------*/
-        Exchange exchange = new DirectExchange("exchange.order.restaurant");
-        rabbitAdmin.declareExchange(exchange);
-
-        Queue queue = new Queue("queue.order");
-        rabbitAdmin.declareQueue(queue);
-
-        Binding binding = new Binding("queue.order",
-                //绑定目的地类型
+    @Bean
+    public Binding binding1() {
+        return new Binding("queue.order",
                 Binding.DestinationType.QUEUE,
                 "exchange.order.restaurant",
                 "key.order",
-                null);
-        rabbitAdmin.declareBinding(binding);
+                null
+        );
+    }
 
-        /*---------------------deliveryman---------------------*/
-        exchange = new DirectExchange("exchange.order.deliveryman");
-        rabbitAdmin.declareExchange(exchange);
+    /*---------------------deliveryman---------------------*/
+    @Bean
+    public Exchange exchange2() {
+        return new DirectExchange("exchange.order.deliveryman");
+    }
 
-        binding = new Binding("queue.order",
-                //绑定目的地类型
+    @Bean
+    public Binding binding2() {
+        return new Binding(
+                "queue.order",
                 Binding.DestinationType.QUEUE,
                 "exchange.order.deliveryman",
                 "key.order",
                 null);
-        rabbitAdmin.declareBinding(binding);
+    }
 
 
-        /*---------------------settlement---------------------*/
+    /*---------settlement---------*/
+    @Bean
+    public Exchange exchange3() {
+        return new FanoutExchange("exchange.order.settlement");
+    }
 
-        exchange = new FanoutExchange("exchange.order.settlement");
-        rabbitAdmin.declareExchange(exchange);
+    @Bean
+    public Exchange exchange4() {
+        return new FanoutExchange("exchange.settlement.order");
+    }
 
-        exchange = new FanoutExchange("exchange.settlement.order");
-        rabbitAdmin.declareExchange(exchange);
-
-        binding = new Binding("queue.order",
-                //绑定目的地类型
+    @Bean
+    public Binding binding3() {
+        return new Binding(
+                "queue.order",
                 Binding.DestinationType.QUEUE,
                 "exchange.settlement.order",
                 "key.order",
                 null);
-        rabbitAdmin.declareBinding(binding);
+    }
 
+    /*--------------reward----------------*/
+    @Bean
+    public Exchange exchange5() {
+        return new TopicExchange("exchange.order.reward");
+    }
 
-        /*---------------------reward---------------------*/
-
-        exchange = new TopicExchange("exchange.order.reward");
-        rabbitAdmin.declareExchange(exchange);
-
-        binding = new Binding("queue.order",
-                //绑定目的地类型
+    @Bean
+    public Binding binding4() {
+        return new Binding(
+                "queue.order",
                 Binding.DestinationType.QUEUE,
                 "exchange.order.reward",
                 "key.order",
                 null);
-        rabbitAdmin.declareBinding(binding);
-
     }
+
+    @Bean
+    public ConnectionFactory connectionFactory() {
+        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
+        connectionFactory.setHost("127.0.0.1");
+        connectionFactory.setPort(5672);
+        connectionFactory.setPassword("guest");
+        connectionFactory.setUsername("guest");
+        //需要使用过后，rabbitAdmin才能正式注入。
+        connectionFactory.createConnection();
+        return connectionFactory;
+    }
+
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory);
+        //rabbitAdmin设置自动执行
+        rabbitAdmin.setAutoStartup(true);
+        return rabbitAdmin;
+    }
+
 }
