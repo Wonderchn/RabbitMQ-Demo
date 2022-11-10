@@ -6,6 +6,7 @@ import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -108,6 +109,9 @@ public class RabbitConfig {
         connectionFactory.setPort(5672);
         connectionFactory.setPassword("guest");
         connectionFactory.setUsername("guest");
+        // 开启RabbitTemplate发送者确认，消息返回机制
+        connectionFactory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
+        connectionFactory.setPublisherReturns(true);
         //需要使用过后，rabbitAdmin才能正式注入。
         connectionFactory.createConnection();
         return connectionFactory;
@@ -119,6 +123,24 @@ public class RabbitConfig {
         //rabbitAdmin设置自动执行
         rabbitAdmin.setAutoStartup(true);
         return rabbitAdmin;
+    }
+
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+        // 托管：callback消息返回必须把托管打开
+        rabbitTemplate.setMandatory(true);
+        // 消息返回时回调的方法
+        rabbitTemplate.setReturnsCallback(returnedMessage -> {
+            log.info("message:{},replyCode:{}，replyText:{},exchange:{},routingKey:{},",
+                    returnedMessage.getMessage(), returnedMessage.getReplyCode(), returnedMessage.getReplyText(), returnedMessage.getExchange(), returnedMessage.getRoutingKey());
+        });
+        // 确认消息收到回调
+        rabbitTemplate.setConfirmCallback((correlationData, b, s) -> {
+            log.info("correlationData:{},ack:{},cause:{}", correlationData, b, s);
+        });
+        return rabbitTemplate;
     }
 
 }
